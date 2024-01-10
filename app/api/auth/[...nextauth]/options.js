@@ -4,7 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import User from "@/app/(models)/User";
 
 import bcrypt from "bcrypt";
-
+import Patient from "@/app/(models)/Patient";
 
 export const options = {
   providers: [
@@ -69,9 +69,33 @@ export const options = {
               console.log("password match");
               delete foundUser.password;
 
-              foundUser["role"] = "Unverified";
+              foundUser["id"] = foundUser._id;
+
+              foundUser["role"] = "Doctor";
               return foundUser;
             }
+          }
+
+          const foundPatient = await Patient.findOne({
+            email: credentials.email,
+          })
+            .lean()
+            .exec();
+
+          if (foundPatient) {
+            console.log("UserExists");
+            const match = await bcrypt.compare(
+              credentials.password,
+              foundPatient.password
+            );
+            if (match) {
+              console.log("password match");
+              delete foundPatient.password;
+              foundPatient["id"] = foundPatient._id;
+              foundPatient["role"] = "Patient";
+              return foundPatient;
+            }
+            router.push("/ClientMember");
           }
         } catch (error) {
           console.log(error);
@@ -82,11 +106,17 @@ export const options = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.role = user.role;
+      if (user) {
+        token.role = user.role;
+        token.id = user.id;
+      }
       return token;
     },
     async session({ session, token }) {
-      if (session?.user) session.user.role = token.role;
+      if (session?.user) {
+        session.user.role = token.role;
+        session.user.id = token.id;
+      }
       return session;
     },
   },

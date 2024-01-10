@@ -3,14 +3,22 @@
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
+
 const UserForm = () => {
   const router = useRouter();
+
+  const getToday = () => {
+    const today = new Date();
+    const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+    return new Intl.DateTimeFormat("en-US", options).format(today);
+  };
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     specialization: "",
-    timeSlots: [{ day: "", startTime: "", endTime: "" }],
+    timeSlots: [{ day: getToday(), startTime: "", endTime: "" }],
   });
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -34,7 +42,10 @@ const UserForm = () => {
   const handleAddTimeSlot = () => {
     setFormData((prevState) => ({
       ...prevState,
-      timeSlots: [...prevState.timeSlots, { day: "", startTime: "", endTime: "" }],
+      timeSlots: [
+        ...prevState.timeSlots,
+        { day: getToday(), startTime: "", endTime: "" },
+      ],
     }));
   };
 
@@ -46,26 +57,76 @@ const UserForm = () => {
     });
   };
 
+  const isValidTimeSlot = (timeSlot) => {
+    return (
+      timeSlot.day === getToday() &&
+      timeSlot.startTime !== "" &&
+      timeSlot.endTime !== ""
+    );
+  };
+
+  const specializationOptions = [
+    "Cardiologist",
+    "Dermatologist",
+    "Endocrinologist",
+    "Gastroenterologist",
+    "Hematologist",
+  ];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+  
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.password ||
+      !formData.specialization ||
+      formData.timeSlots.length === 0
+    ) {
+      setErrorMessage("All fields are required.");
+      return;
+    }
+  
+    if (!formData.timeSlots.every(isValidTimeSlot)) {
+      setErrorMessage("Invalid time slots. Ensure day, start time, and end time are provided.");
+      return;
+    }
+  
+    const formattedTimeSlots = formData.timeSlots.map((timeSlot) => ({
+      day: timeSlot.day,
+      startTime: timeSlot.startTime,
+      endTime: timeSlot.endTime,
+    }));
+  
+    console.log(formattedTimeSlots)
 
     const res = await fetch("/api/Users", {
       method: "POST",
-      body: JSON.stringify(formData),
+      body: JSON.stringify({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        specialization: formData.specialization,
+        timeSlots: formattedTimeSlots,  
+      }),
       headers: {
         "Content-Type": "application/json",
       },
     });
 
+    console.log(res)
+  
     if (!res.ok) {
       const response = await res.json();
-      setErrorMessage(response.message);
+      setErrorMessage(response.messages);  
     } else {
       router.refresh();
       router.push("/");
     }
   };
+
+  
 
   return (
     <>
@@ -99,34 +160,38 @@ const UserForm = () => {
           required
         />
         <label>Specialization</label>
-        <input
+        <select
           id="specialization"
           name="specialization"
-          type="text"
           onChange={handleChange}
           value={formData.specialization}
           required
-        />
+        >
+          <option value="" disabled>Select specialization</option>
+          {specializationOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
         <label>Time Slots</label>
         {formData.timeSlots.map((timeSlot, index) => (
-          <div key={index}>
+          <div key={index} className="time-slot">
             <label>Day</label>
-            <input
-              type="text"
-              value={timeSlot.day}
-              onChange={(e) => handleTimeSlotChange(index, "day", e.target.value)}
-            />
+            <p>{timeSlot.day}</p>
             <label>Start Time</label>
             <input
-              type="text"
+              type="time"
               value={timeSlot.startTime}
               onChange={(e) => handleTimeSlotChange(index, "startTime", e.target.value)}
+              required
             />
             <label>End Time</label>
             <input
-              type="text"
+              type="time"
               value={timeSlot.endTime}
               onChange={(e) => handleTimeSlotChange(index, "endTime", e.target.value)}
+              required
             />
             <button type="button" onClick={() => handleRemoveTimeSlot(index)}>
               Remove
@@ -144,3 +209,4 @@ const UserForm = () => {
 };
 
 export default UserForm;
+
